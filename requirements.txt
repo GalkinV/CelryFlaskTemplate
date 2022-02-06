@@ -1,0 +1,10 @@
+pyproj==3.3.0
+Shapely==1.8.0
+redis==4.1.2
+celery==5.2.3
+requests==2.27.1
+numpy==1.22.2
+tqdm==4.62.3
+Flask==2.0.2
+uWSGI==2.0.20
+

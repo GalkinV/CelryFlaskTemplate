@@ -1,0 +1,6 @@
+/.idea
+/venv
+/logs
+.pytest_cache
+__pycache__
+.coverage

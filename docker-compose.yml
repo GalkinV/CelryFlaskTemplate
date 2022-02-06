@@ -1,0 +1,73 @@
+version: "3.9"
+services:
+  broker:
+    image: redis:5-alpine
+    hostname: redis
+    env_file:
+      &envfile
+      - env.env
+    ports:
+      - 6379:6379
+    command: ["redis-server", "--save 60 1", "--requirepass", "redismpipe"]
+    volumes:
+      - ./db:/data
+
+  worker_1:
+    build:
+      context: .
+      target: etl
+      dockerfile: Dockerfile
+    image: mpipe:v1.0
+    restart: "no"
+    hostname: worker_1
+    env_file: *envfile
+    working_dir: /app
+    volumes:
+      - ./app:/app
+      - ./tasks:/tasks
+      - ./data:/data
+    command: [ "celery", "-A", "worker.app", "worker", "--queues=queue_1", "--loglevel=INFO", "--autoscale=1,8", "-E", "-O", "fair", "--prefetch-multiplier=1"]
+    depends_on:
+      - broker
+#  worker_2:
+#    image: mpipe:v1.0
+#    restart: "no"
+#    hostname: worker_2
+#    env_file: *envfile
+#    command: [ "celery", "-A", "worker.app", "worker", "--queues=queue_2", "--loglevel=INFO", "--autoscale=1,4", "-E", "-O", "fair", "--prefetch-multiplier=1"]
+#    volumes:
+#      - ./app:/app
+#      - ./tasks:/tasks
+#      - ./data:/data
+#    depends_on:
+#      - broker
+
+  monitor:
+    image: mpipe:v1.0
+    hostname: monitor
+    restart: "no"
+    env_file: *envfile
+    ports:
+      - 15555:5555
+    working_dir: /app
+    command: [ "celery", "--app=worker.app", "flower", "--persistent=False", "--persistent=True", "--db=/db/flower.db"]
+    volumes:
+      - ./app:/app
+      - ./db:/db
+    depends_on:
+      - broker
+#      - scheduler
+
+  flask_srv:
+    image: mpipe:v1.0
+    restart: "no"
+    hostname: flask_srv
+    ports:
+      - 8080:8080
+    working_dir: /app
+    env_file: *envfile
+    volumes:
+      - ./.:/app
+    command: ["uwsgi", "--http", "0.0.0.0:8080", "--wsgi-file", "/app/run.py", "--callable", "app", "--stats", "0.0.0.0:81"]
+    depends_on:
+      - monitor
